@@ -72,7 +72,9 @@ td input{width:66px}
 #res .chip{padding:3px 10px;border-radius:999px;font-weight:800;font-size:12px}
 #res .list{max-height:240px;overflow:auto;margin-top:8px}
 #res .li{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:13px}
-#vidCard{margin-bottom:12px}
+#vidCard{margin-bottom:12px;animation:vpop .28s ease}
+#vidCard.off{position:fixed;left:-10000px;top:0;width:380px;animation:none}
+@keyframes vpop{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
 .vbox{position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000}
 .vbox>*{position:absolute;inset:0;width:100%;height:100%}
 .vtools button{padding:6px 9px;font-size:12px}
@@ -105,7 +107,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   </section>
 
   <section id="right">
-    <div class="card" id="vidCard" style="display:none">
+    <div class="card off" id="vidCard" style="display:none">
       <div class="ttl">시범 영상</div>
       <div class="vbox"><div id="yt"></div></div>
       <div class="note" id="vidInfo"></div>
@@ -262,8 +264,15 @@ function ytApiReady() {
     }
   });
 }
+// 영상 카드는 평소엔 화면 밖에서 미리 불러두고, 시범 보기·악보 편집 때만 보여줌
+let curTab = 'play';
+function setVidShow() {
+  const show = !!chart.v && (vid.on || curTab === 'edit');
+  $('#vidCard').classList.toggle('off', !show);
+}
 function renderVid() {
   $('#vidCard').style.display = chart.v ? '' : 'none';
+  setVidShow();
   $('#vLink').value = chart.v ? 'https://youtu.be/' + chart.v : '';
   $('#vStart').value = chart.v ? fmtTime(chart.vs) : '';
   if (!chart.v) { if (yt) { try { yt.stopVideo(); } catch (e) {} } return; }
@@ -452,7 +461,7 @@ function begin(m) {
     // 영상 시범: 첫 입력 VLEAD초 전부터 재생, 노트는 영상 시간에 맞춰 이동
     vid.lead = Math.min(VLEAD, chart.vs);
     try { yt.setPlaybackRate(+opt.speed); yt.seekTo(chart.vs - vid.lead, true); yt.playVideo(); } catch (e) {}
-    vid.on = true; vid.p = 0; vid.last = 0; cdUnit = 1000 / opt.speed;
+    vid.on = true; vid.p = 0; vid.last = 0; cdUnit = 1000 / opt.speed; setVidShow();
     pT0 = performance.now() + vid.lead * 1000 / opt.speed; startT = pT0 + chart.n[0].f * FR / opt.speed;
     clickIdx = 0; lastCount = Math.ceil(vid.lead) + 1; mode = 'demo';
     showJudge('시범 보기', '영상과 노트를 같이 보며 리듬을 익혀 보세요', '');
@@ -757,7 +766,7 @@ function loop(now) {
     if (pIdx >= E.length) finish();
   }
   if (mode === 'demo' && clickIdx >= chart.n.length && now - tOf(chart.n[chart.n.length - 1]) > (vid.on ? 1500 : 700)) {
-    if (vid.on) { try { yt.pauseVideo(); } catch (e) {} vid.on = false; }
+    if (vid.on) { try { yt.pauseVideo(); } catch (e) {} vid.on = false; setVidShow(); }
     mode = 'idle'; marks.clear(); markGuide(); showJudge('시범 끝', '이제 ▶ 연습 시작으로 따라 쳐 보세요', '');
   }
   draw(now, inp);
@@ -849,11 +858,12 @@ bindOpt('#oLabel', 'label', Number); bindOpt('#oSide', 'side', Number);
 
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('sel', x === b));
+  curTab = b.dataset.tab; setVidShow();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab));
 });
 $('#bPlay').onclick = e => { e.target.blur(); ensureAudio(); begin('play'); };
 $('#bDemo').onclick = e => { e.target.blur(); ensureAudio(); begin('demo'); };
-$('#bStop').onclick = () => { if (vid.on) { try { yt.pauseVideo(); } catch (e) {} vid.on = false; } mode = 'idle'; marks.clear(); combo = 0; markGuide(); showJudge('', ''); };
+$('#bStop').onclick = () => { if (vid.on) { try { yt.pauseVideo(); } catch (e) {} vid.on = false; setVidShow(); } mode = 'idle'; marks.clear(); combo = 0; markGuide(); showJudge('', ''); };
 $('#bRec').onclick = e => { e.target.blur(); mode = 'rec-armed'; marks.clear(); status('준비 완료. 콤보의 첫 입력부터 시작하세요.'); };
 $('#bRecStop').onclick = finishRec;
 $('#eTitle').oninput = e => { chart.t = e.target.value.slice(0, 80); updateHash(); $('#ctitle').textContent = chart.t || '(이름 없음)'; };
